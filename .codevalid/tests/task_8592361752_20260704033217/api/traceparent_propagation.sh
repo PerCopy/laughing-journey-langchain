@@ -2,22 +2,21 @@
 set -eu
 BASE_URL="${BASE_URL:-http://app:6713}"
 WIREMOCK_URL="${WIREMOCK_URL:-http://wiremock:8080}"
-CASE_SUFFIX="$(date +%s)-$$"
 TRACEPARENT="00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba903b5-01"
 ORDER_ID="ord-77665"
-MAPPING_ID="traceparent-propagation-${CASE_SUFFIX}"
 TMP_DIR="$(mktemp -d)"
+MAPPING_ID=""
 cleanup() {
-  curl -fsS -X DELETE "$WIREMOCK_URL/__admin/mappings/${MAPPING_ID}" >/dev/null 2>&1 || true
+  if [ -n "$MAPPING_ID" ]; then
+    curl -fsS -X DELETE "$WIREMOCK_URL/__admin/mappings/${MAPPING_ID}" >/dev/null 2>&1 || true
+  fi
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
 
-# Given
+# Given: register a detection mapping (no id - WireMock auto-assigns a UUID)
 cat >"$TMP_DIR/mapping.json" <<EOF
 {
-  "id": "${MAPPING_ID}",
-  "name": "${MAPPING_ID}",
   "request": {
     "method": "ANY",
     "urlPathPattern": "/.*",
@@ -28,13 +27,14 @@ cat >"$TMP_DIR/mapping.json" <<EOF
   "response": {
     "status": 200,
     "headers": { "Content-Type": "application/json" },
-    "jsonBody": { "matched": true, "mapping": "${MAPPING_ID}" }
+    "jsonBody": { "matched": true }
   }
 }
 EOF
-curl -fsS -X POST "$WIREMOCK_URL/__admin/mappings" \
+MAPPING_RESPONSE="$(curl -fsS -X POST "$WIREMOCK_URL/__admin/mappings" \
   -H 'Content-Type: application/json' \
-  --data @"$TMP_DIR/mapping.json" >/dev/null
+  --data @"$TMP_DIR/mapping.json")"
+MAPPING_ID="$(printf '%s' "$MAPPING_RESPONSE" | jq -r '.id')"
 
 # When
 curl -sS -o "$TMP_DIR/response.txt" -w '%{http_code}' \

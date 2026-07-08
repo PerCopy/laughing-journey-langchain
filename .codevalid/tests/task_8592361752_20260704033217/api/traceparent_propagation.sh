@@ -5,7 +5,7 @@ WIREMOCK_URL="${WIREMOCK_URL:-http://wiremock:8080}"
 CASE_SUFFIX="$(date +%s)-$$"
 TRACEPARENT="00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba903b5-01"
 ORDER_ID="ord-77665"
-MAPPING_ID="traceparent-propagation-${CASE_SUFFIX}"
+MAPPING_ID="$(cat /proc/sys/kernel/random/uuid)"
 TMP_DIR="$(mktemp -d)"
 cleanup() {
   curl -fsS -X DELETE "$WIREMOCK_URL/__admin/mappings/${MAPPING_ID}" >/dev/null 2>&1 || true
